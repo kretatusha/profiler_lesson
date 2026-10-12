@@ -5,7 +5,6 @@ import sys
 from collections import defaultdict, Counter, OrderedDict
 from datetime import datetime
 from operator import itemgetter
-from line_profiler import profile
 
 
 LOG_RE = re.compile(r'''
@@ -27,12 +26,12 @@ LOG_RE = re.compile(r'''
   \s*
 ''', re.VERBOSE)
 
-@profile
+
 def parse_to_dict(line):
     m = LOG_RE.match(line)
     return m.groupdict()
 
-@profile
+
 def parse_ints(parsed_dict):
     for field in ('STATUS', 'SIZE', 'PROCESS_TIME'):
         if field in parsed_dict:
@@ -40,7 +39,7 @@ def parse_ints(parsed_dict):
 
     return parsed_dict
 
-@profile
+
 def parse_datetime(parsed_dict):
     parsed_dict['DATETIME'] = datetime.strptime(
         parsed_dict['TIMESTAMP'], '%d/%b/%Y:%H:%M:%S %z')
@@ -51,7 +50,7 @@ REQUEST_RE = re.compile(r'''
   (?P<REQUEST_METHOD>[A-Z]+)\s(?P<REQUEST_URL>[^ ]+)\sHTTP/
 ''', re.VERBOSE)
 
-@profile
+
 def parse_request(parsed_dict):
     parsed_dict.update(REQUEST_RE.match(parsed_dict['REQUEST']).groupdict())
     return parsed_dict
@@ -59,7 +58,7 @@ def parse_request(parsed_dict):
 
 PARSERS = (parse_to_dict, parse_ints, parse_datetime, parse_request)
 
-@profile
+
 def parse_file(lines, parsers=PARSERS):
     for line in lines:
         try:
@@ -70,7 +69,7 @@ def parse_file(lines, parsers=PARSERS):
         except Exception as e:
             pass
 
-@profile
+
 def prepare_output(stats: dict, offset=0, indent=2) -> str:
     """
     This function provides very simple yaml-like format
@@ -110,13 +109,11 @@ class SlowestPage(Statistics):
         self.slowest_page = None
         self.slowest_page_speed = 0
 
-    @profile
     def handle_record(self, record):
         if record['PROCESS_TIME'] >= self.slowest_page_speed:
             self.slowest_page_speed = record['PROCESS_TIME']
             self.slowest_page = record['REQUEST_URL']
 
-    @profile
     def result(self):
         return self.slowest_page
 
@@ -126,13 +123,11 @@ class FastestPage(Statistics):
         self.fastest_page = None
         self.fastest_page_speed = 10 ** 100
 
-    @profile
     def handle_record(self, record):
         if record['PROCESS_TIME'] <= self.fastest_page_speed:
             self.fastest_page_speed = record['PROCESS_TIME']
             self.fastest_page = record['REQUEST_URL']
 
-    @profile
     def result(self):
         return self.fastest_page
 
@@ -141,13 +136,11 @@ class SlowestAveragePage(Statistics):
     def __init__(self):
         self.pages = defaultdict(lambda: {'count': 0, 'cumulative_time': 0})
 
-    @profile
     def handle_record(self, record):
         page = record['REQUEST_URL']
         self.pages[page]['count'] += 1
         self.pages[page]['cumulative_time'] += record['PROCESS_TIME']
 
-    @profile
     def result(self):
         def average(dct):
             return dct['cumulative_time'] / dct['count']
@@ -155,7 +148,7 @@ class SlowestAveragePage(Statistics):
         page, stat = max(self.pages.items(), key=lambda tpl: average(tpl[1]))
         return page
 
-@profile
+
 def most_common_lex_minimal(counter):
     max_count = None
     answers = []
@@ -174,11 +167,9 @@ class MostPopularPage(Statistics):
     def __init__(self):
         self.pages = Counter()
 
-    @profile
     def handle_record(self, record):
         self.pages[record['REQUEST_URL']] += 1
 
-    @profile
     def result(self):
         return most_common_lex_minimal(self.pages)
 
@@ -187,11 +178,9 @@ class MostActiveClient(Statistics):
     def __init__(self):
         self.clients = Counter()
 
-    @profile
     def handle_record(self, record):
         self.clients[record['IP']] += 1
 
-    @profile
     def result(self):
         return most_common_lex_minimal(self.clients)
 
@@ -200,11 +189,9 @@ class MostPopularBrowser(Statistics):
     def __init__(self):
         self.browsers = Counter()
 
-    @profile
     def handle_record(self, record):
         self.browsers[record['USER_AGENT']] += 1
 
-    @profile
     def result(self):
         return most_common_lex_minimal(self.browsers)
 
@@ -213,11 +200,9 @@ class MostActiveClientByDay(Statistics):
     def __init__(self):
         self.stat_by_day = defaultdict(Counter)
 
-    @profile
     def handle_record(self, record):
         self.stat_by_day[record['DATETIME'].date()][record['IP']] += 1
 
-    @profile
     def result(self):
         return OrderedDict(sorted(
             ((date, most_common_lex_minimal(counter))
@@ -233,7 +218,7 @@ ALL_STATS = (SlowestPage, FastestPage, SlowestAveragePage, MostPopularPage,
 #                   (inspect.isclass(cls) and issubclass(cls, Statistics) and
 #                    not inspect.isabstract(cls)))
 
-@profile
+
 def harvest_stats(feed, statistics=ALL_STATS):
     stats_builders = list(map(lambda x: x(), statistics))
     for record in feed:
@@ -247,8 +232,7 @@ def harvest_stats(feed, statistics=ALL_STATS):
 
 
 def main():
-    # with sys.stdin as f:
-    with open("example_1.log") as f:
+    with sys.stdin as f:
         stats = harvest_stats(parse_file(f))
         print(prepare_output(stats))
 
