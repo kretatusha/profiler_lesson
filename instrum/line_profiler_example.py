@@ -25,7 +25,7 @@ def do_some_action():
 
 do_some_action()
 
-# kernprof -l statistic.line_profiler_example.py - run statistic
+# kernprof -l instrum.line_profiler_example.py - run statistic
 
 # Inspect results with:
 # python -m line_profiler -rmt line_profiler_example.py.lprof
