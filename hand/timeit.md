@@ -1,0 +1,1 @@
+python -m timeit -n 10 -s 'import euler3' 'euler3.find_prime_factors(1233232)' 
